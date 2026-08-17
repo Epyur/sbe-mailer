@@ -1,6 +1,6 @@
 {
   "name": "sbe-mailer",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "description": "Модуль писем как SBE-плагин: локальная БД yourbase/sbe_mailer/, синхронизация с mailer-service через JWT из ЦУП СБЕ ПМиПИР.",
   "main": "main.js",
   "scripts": {

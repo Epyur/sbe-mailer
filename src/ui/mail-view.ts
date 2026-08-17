@@ -16,6 +16,7 @@ export class MailView extends ItemView {
   private filterDateFrom = '';
   private filterDateTo = '';
   private filterAuthor = '';
+  private myRole = '';
 
   constructor(leaf: WorkspaceLeaf, plugin: SbeMailPlugin) {
     super(leaf);
@@ -39,7 +40,19 @@ export class MailView extends ItemView {
     container.addClass('tn-mail-container');
     this.containerElContent = container.createDiv();
     this.selectedDirectionIds = new Set(this.plugin.settings.selectedDirectionIds);
+    try {
+      const me = await this.plugin.syncService.getMyPermission();
+      this.myRole = me.hasAccess ? me.role : '';
+    } catch (e: unknown) {
+      console.warn('Письма: не удалось получить роль:', errorMessage(e));
+      this.myRole = '';
+    }
     await this.syncAndRender();
+  }
+
+  /** Роль editor или выше — можно создавать/редактировать письма. */
+  private get canEdit(): boolean {
+    return this.myRole === 'editor' || this.myRole === 'admin';
   }
 
   refresh(): void {
@@ -53,8 +66,10 @@ export class MailView extends ItemView {
 
     const header = container.createDiv({ cls: 'tn-mail-header' });
     header.createEl('h3', { text: '📧 Письма' });
-    const newBtn = header.createEl('button', { text: '➕ Новое письмо', cls: 'tn-btn tn-btn-primary' });
-    newBtn.addEventListener('click', () => this.showCreateForm());
+    if (this.canEdit) {
+      const newBtn = header.createEl('button', { text: '➕ Новое письмо', cls: 'tn-btn tn-btn-primary' });
+      newBtn.addEventListener('click', () => this.showCreateForm());
+    }
     const refreshBtn = header.createEl('button', { text: '🔄', cls: 'tn-btn tn-btn-ghost' });
     refreshBtn.addEventListener('click', () => { void this.syncAndRender(); });
     const exportBtn = header.createEl('button', { text: '📄 Экспорт HTML', cls: 'tn-btn tn-btn-ghost' });
@@ -223,8 +238,10 @@ export class MailView extends ItemView {
 
     const btnRow = container.createDiv({ cls: 'tn-mail-header tn-mail-mt12' });
 
-    const editBtn = btnRow.createEl('button', { text: '✏️ Редактировать', cls: 'tn-btn tn-btn-ghost' });
-    editBtn.addEventListener('click', () => this.showEditForm(email));
+    if (this.canEdit) {
+      const editBtn = btnRow.createEl('button', { text: '✏️ Редактировать', cls: 'tn-btn tn-btn-ghost' });
+      editBtn.addEventListener('click', () => this.showEditForm(email));
+    }
 
     const exportBtn = btnRow.createEl('button', { text: '📥 Экспорт в Word', cls: 'tn-btn tn-btn-ghost' });
     exportBtn.addEventListener('click', async () => {

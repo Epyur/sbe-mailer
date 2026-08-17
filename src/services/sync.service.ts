@@ -128,6 +128,89 @@ export class MailSyncService {
     }
   }
 
+  /** Возвращает роль текущего пользователя ({email, role, hasAccess}). */
+  async getMyPermission(): Promise<{ email: string; role: string; hasAccess: boolean }> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/permissions/me`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    this.assertOk(res);
+    try {
+      return JSON.parse(res.text) as { email: string; role: string; hasAccess: boolean };
+    } catch (e: unknown) {
+      console.warn('Письма: не JSON в ответе permissions/me:', errorMessage(e));
+      return { email: '', role: '', hasAccess: false };
+    }
+  }
+
+  /** Список прав (для admin). */
+  async listPermissions(): Promise<Array<{ email: string; role: string }>> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/permissions`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    this.assertOk(res);
+    try {
+      const data = JSON.parse(res.text) as { permissions?: Array<{ email: string; role: string }> };
+      return Array.isArray(data.permissions) ? data.permissions : [];
+    } catch (e: unknown) {
+      console.warn('Письма: не JSON в ответе permissions:', errorMessage(e));
+      return [];
+    }
+  }
+
+  /** Устанавливает/отзывает роль (для admin). role='' — отозвать. */
+  async setPermission(email: string, role: string): Promise<void> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/permissions`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email, role }),
+    });
+    this.assertOk(res);
+  }
+
+  /** Текущий уровень общего доступа (для admin). */
+  async getCommonAccess(): Promise<string> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/common-access`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    this.assertOk(res);
+    try {
+      const data = JSON.parse(res.text) as { level?: string };
+      return data.level || '';
+    } catch (e: unknown) {
+      console.warn('Письма: не JSON в ответе common-access:', errorMessage(e));
+      return '';
+    }
+  }
+
+  /** Устанавливает уровень общего доступа (для admin). level='' — отключить. */
+  async setCommonAccess(level: string): Promise<void> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/common-access`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ level }),
+    });
+    this.assertOk(res);
+  }
+
+  private assertOk(res: { status: number; text: string }): void {
+    if (res.status === 401) throw new Error('Ключ доступа недействителен. Запросите новый ключ в ЦУП.');
+    if (res.status === 403) throw new Error('Нет прав администратора. Обратитесь к владельцу.');
+    if (res.status !== 200) throw new Error(this.errorText(res) || `Сервер вернул HTTP ${res.status}`);
+  }
+
   private errorText(res: { status: number; text: string }): string {
     if (!res.text) return '';
     try {
