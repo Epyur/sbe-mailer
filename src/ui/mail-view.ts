@@ -55,6 +55,11 @@ export class MailView extends ItemView {
     return this.myRole === 'editor' || this.myRole === 'admin';
   }
 
+  /** Роль admin — можно удалять письма из базы. */
+  private get canDelete(): boolean {
+    return this.myRole === 'admin';
+  }
+
   refresh(): void {
     this.renderView();
   }
@@ -168,7 +173,7 @@ export class MailView extends ItemView {
       filtered = filtered.filter(e => e.author === this.filterAuthor);
     }
 
-    filtered.sort((a, b) => b.id - a.id);
+    filtered.sort((a, b) => this.compareDatesDesc(a.date, b.date));
 
     const table = container.createEl('table', { cls: 'tn-table' });
 
@@ -268,6 +273,27 @@ export class MailView extends ItemView {
         exportBtn.removeAttribute('disabled');
       }
     });
+
+    if (this.canDelete) {
+      const deleteBtn = btnRow.createEl('button', { text: '🗑 Удалить письмо', cls: 'tn-btn tn-btn-ghost' });
+      deleteBtn.addEventListener('click', async () => {
+        const confirmed = window.confirm(`Удалить письмо «${email.number} — ${email.subject}» из базы? Это действие нельзя отменить.`);
+        if (!confirmed) return;
+        deleteBtn.setText('⏳');
+        deleteBtn.setAttr('disabled', 'true');
+        try {
+          await this.plugin.syncService.deleteEmail(email.id);
+          this.plugin.mailDb.deleteEmail(email.id);
+          await this.plugin.mailDb.save();
+          new Notice('Письмо удалено');
+          this.renderView();
+        } catch (e: unknown) {
+          new Notice(`Письма: не удалось удалить — ${errorMessage(e)}`);
+          deleteBtn.setText('🗑 Удалить письмо');
+          deleteBtn.removeAttribute('disabled');
+        }
+      });
+    }
 
     if (email.images && email.images.length > 0) {
       container.createEl('h4', { text: 'Прикреплённые файлы' });
@@ -392,8 +418,34 @@ export class MailView extends ItemView {
 
     container.createEl('h3', { text: '✉️ Новое письмо' });
 
+    const dirLabel = container.createEl('label', { text: 'Направление', cls: 'tn-mail-label' });
+    const dirInput = container.createEl('input', {
+      attr: { type: 'text', list: 'tn-mail-dirs' },
+      cls: 'tn-mail-input',
+    });
+    this.renderDirDatalist(dirInput);
+
+    const dirRow = container.createDiv({ cls: 'tn-mail-flex tn-mail-mb12' });
+    const addDirBtn = dirRow.createEl('button', { text: '➕ Создать направление', cls: 'tn-btn tn-btn-ghost' });
+    addDirBtn.addEventListener('click', () => this.createDirectionFromField(dirInput));
+
     const numberLabel = container.createEl('label', { text: 'Исходящий номер', cls: 'tn-mail-label' });
+    const numberHint = container.createDiv({ cls: 'tn-mail-meta tn-mail-mb8', text: 'Автоматически подставляется Номер последнего известного письма по выбранному направлению, не забудьте изменить' });
     const numberInput = container.createEl('input', { attr: { type: 'text', placeholder: 'Например: 009' }, cls: 'tn-mail-input' });
+
+    // При выборе направления подставляем номер последнего письма этого направления.
+    dirInput.addEventListener('change', () => {
+      const dirName = dirInput.value.trim();
+      if (!dirName) return;
+      const dirId = this.plugin.mailDb.getDirections().find(d => d.name === dirName)?.id;
+      if (dirId === undefined) return;
+      const last = this.plugin.mailDb.getAllEmails()
+        .filter(e => e.direction_id === dirId && e.number && e.number.trim() !== '')
+        .sort((a, b) => this.compareDatesDesc(a.date, b.date))[0];
+      if (last && last.number) {
+        numberInput.value = last.number;
+      }
+    });
 
     const subjectLabel = container.createEl('label', { text: 'Тема письма', cls: 'tn-mail-label' });
     const subjectInput = container.createEl('input', { attr: { type: 'text', placeholder: 'Тема' }, cls: 'tn-mail-input' });
@@ -460,17 +512,6 @@ export class MailView extends ItemView {
       renderFiles();
       fileInput.value = '';
     });
-
-    const dirLabel = container.createEl('label', { text: 'Направление', cls: 'tn-mail-label' });
-    const dirInput = container.createEl('input', {
-      attr: { type: 'text', list: 'tn-mail-dirs' },
-      cls: 'tn-mail-input',
-    });
-    this.renderDirDatalist(dirInput);
-
-    const dirRow = container.createDiv({ cls: 'tn-mail-flex tn-mail-mb12' });
-    const addDirBtn = dirRow.createEl('button', { text: '➕ Создать направление', cls: 'tn-btn tn-btn-ghost' });
-    addDirBtn.addEventListener('click', () => this.createDirectionFromField(dirInput));
 
     const btnRow = container.createDiv({ cls: 'tn-mail-header tn-mail-mt12' });
 
@@ -603,7 +644,7 @@ export class MailView extends ItemView {
     if (this.filterAuthor) {
       filtered = filtered.filter(e => e.author === this.filterAuthor);
     }
-    filtered.sort((a, b) => b.id - a.id);
+    filtered.sort((a, b) => this.compareDatesDesc(a.date, b.date));
 
     let html = '';
     for (const e of filtered) {
@@ -629,6 +670,16 @@ export class MailView extends ItemView {
 
   private escapeHtml(text: string): string {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /** Сравнение по дате письма: сначала новые (desc). Невалидные даты — в конец. */
+  private compareDatesDesc(a: string, b: string): number {
+    const ta = new Date(a).getTime();
+    const tb = new Date(b).getTime();
+    if (Number.isNaN(ta) && Number.isNaN(tb)) return 0;
+    if (Number.isNaN(ta)) return 1;
+    if (Number.isNaN(tb)) return -1;
+    return tb - ta;
   }
 
   async syncAndRender(): Promise<void> {

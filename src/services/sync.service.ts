@@ -205,6 +205,19 @@ export class MailSyncService {
     this.assertOk(res);
   }
 
+  /** Удаляет письмо на сервере (только admin). */
+  async deleteEmail(id: number): Promise<void> {
+    const token = await this.getToken();
+    const res = await this.request({
+      url: `${this.baseUrl}/api/mailer/delete`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    });
+    if (res.status === 403) throw new Error('Нет прав администратора. Обратитесь к владельцу.');
+    if (res.status !== 200) throw new Error(this.errorText(res) || `Сервер вернул HTTP ${res.status}`);
+  }
+
   private assertOk(res: { status: number; text: string }): void {
     if (res.status === 401) throw new Error('Ключ доступа недействителен. Запросите новый ключ в ЦУП.');
     if (res.status === 403) throw new Error('Нет прав администратора. Обратитесь к владельцу.');
