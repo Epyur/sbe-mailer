@@ -128,7 +128,7 @@ export class DocumentService {
         number: emailData.number || '',
         subject: emailData.subject || '',
         textForWord: this.formatTextForWord(originalText),
-        author: emailData.author || 'Кравченко А.А.',
+        author: emailData.author || 'И.И. Иванов',
         date: formattedDate,
         year: emailDate.getFullYear().toString(),
         month: (emailDate.getMonth() + 1).toString().padStart(2, '0'),

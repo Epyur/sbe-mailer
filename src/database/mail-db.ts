@@ -168,4 +168,68 @@ export class MailDatabase {
       updated_at: e.updated_at || e.lastSyncTime || e.created_at || now,
     }));
   }
+
+  /** Дополняет БД легаси-письмами, которых ещё нет по id (для повторных миграций).
+   *  Письмо также пропускается, если его тема уже есть в локальной БД — это защита
+   *  от дублирования, когда легаси-письмо уже попало на сервер под другим id. */
+  importMissingLegacy(emails: MailItem[], directions: MailDirection[]): number {
+    const now = new Date().toISOString();
+    const existingIds = new Set(this.data.emails.map(e => e.id));
+    const existingSubjects = new Set(this.data.emails.map(e => this.normKey(e.subject)));
+    let added = 0;
+    for (const d of directions) {
+      if (!this.data.directions.some(x => x.id === d.id)) {
+        this.data.directions.push({
+          id: d.id,
+          name: d.name,
+          description: d.description || '',
+          created_at: d.created_at || now,
+        });
+      }
+    }
+    for (const e of emails) {
+      if (existingIds.has(e.id)) continue;
+      if (existingSubjects.has(this.normKey(e.subject))) continue;
+      this.data.emails.push({
+        ...e,
+        images: Array.isArray(e.images) ? e.images : [],
+        direction_name: e.direction_name || this.getDirectionName(e.direction_id),
+        sync_status: 'local',
+        lastSyncTime: e.lastSyncTime || e.created_at || now,
+        created_at: e.created_at || e.date || now,
+        updated_at: e.updated_at || e.lastSyncTime || e.created_at || now,
+      });
+      existingIds.add(e.id);
+      existingSubjects.add(this.normKey(e.subject));
+      added++;
+    }
+    return added;
+  }
+
+  /** Нормализованный ключ темы для сравнения при миграции. */
+  private normKey(s: string): string {
+    return (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  /** Удаляет дубликаты по id, оставляя самую свежую запись. */
+  dedupe(): number {
+    const seen = new Map<number, number>();
+    const keep: MailItem[] = [];
+    let removed = 0;
+    for (const e of this.data.emails) {
+      const existing = seen.get(e.id);
+      if (existing === undefined) {
+        seen.set(e.id, keep.length);
+        keep.push(e);
+        continue;
+      }
+      const prev = keep[existing];
+      if (this.compareTime(e.updated_at, prev.updated_at) >= 0) {
+        keep[existing] = e;
+      }
+      removed++;
+    }
+    this.data.emails = keep;
+    return removed;
+  }
 }

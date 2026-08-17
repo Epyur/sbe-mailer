@@ -159,7 +159,7 @@ export class MailView extends ItemView {
 
     const thead = table.createEl('thead');
     const headerRow = thead.createEl('tr');
-    const headers = ['№ п/п', 'Номер письма', 'Дата письма', 'Тема письма', 'Автор'];
+    const headers = ['№ п/п', 'Номер письма', 'Дата письма', 'Тема письма', 'Направление', 'Автор'];
     for (const h of headers) {
       const th = headerRow.createEl('th');
       th.setText(h);
@@ -170,7 +170,7 @@ export class MailView extends ItemView {
     if (filtered.length === 0) {
       const emptyRow = tbody.createEl('tr');
       const td = emptyRow.createEl('td', { cls: 'tn-mail-center tn-mail-p24' });
-      td.setAttr('colspan', '5');
+      td.setAttr('colspan', '6');
       td.setText('Нет писем');
       return;
     }
@@ -191,6 +191,9 @@ export class MailView extends ItemView {
 
       const subjectCell = row.createEl('td');
       subjectCell.setText(email.subject);
+
+      const dirCell = row.createEl('td');
+      dirCell.setText(email.direction_name || this.plugin.mailDb.getDirectionName(email.direction_id) || '—');
 
       const authorCell = row.createEl('td');
       authorCell.setText(email.author);
@@ -379,6 +382,36 @@ export class MailView extends ItemView {
     const textInput = container.createEl('textarea', { cls: 'tn-mail-textarea' });
     textInput.value = initialText;
 
+    const aiDiv = container.createDiv({ cls: 'tn-mail-mt12 tn-mail-flex tn-mail-flex-wrap' });
+    const aiInput = container.createEl('input', {
+      attr: { type: 'text', placeholder: 'Опишите запрос для черновика: «ответ клиенту про ПВХ-мембраны на кровле»' },
+      cls: 'tn-mail-input tn-mail-mb8',
+    });
+    aiDiv.appendChild(aiInput);
+    const aiBtn = container.createEl('button', { text: '✨ Сгенерировать черновик (AI)', cls: 'tn-btn tn-btn-primary' });
+    aiDiv.appendChild(aiBtn);
+
+    aiBtn.addEventListener('click', async () => {
+      const request = aiInput.value.trim();
+      if (!request) {
+        new Notice('Опишите, что нужно написать');
+        return;
+      }
+      aiBtn.setText('⏳ Поиск и генерация…');
+      aiBtn.setAttr('disabled', 'true');
+      try {
+        const draft = await this.plugin.llmGenerator.generateDraft(request);
+        subjectInput.value = draft.subject;
+        textInput.value = draft.text;
+        new Notice(`AI: черновик готов (на основе ${draft.sourceCount} писем локальной базы)`);
+      } catch (e: unknown) {
+        new Notice(`Письма: генерация не удалась — ${errorMessage(e)}`);
+      } finally {
+        aiBtn.setAttr('disabled', null);
+        aiBtn.setText('✨ Сгенерировать черновик (AI)');
+      }
+    });
+
     const filesLabel = container.createEl('label', { text: 'Прикреплённые файлы', cls: 'tn-mail-label' });
     const filesDiv = container.createDiv({ cls: 'tn-mail-mb-8' });
 
@@ -436,7 +469,7 @@ export class MailView extends ItemView {
 
       const now = new Date().toISOString();
       const emailId = Date.now() + Math.floor(Math.random() * 1000);
-      const author = this.plugin.settings.defaultAuthor || 'Кравченко А.А.';
+      const author = this.plugin.settings.defaultAuthor || 'И.И. Иванов';
       const directionId = this.plugin.mailDb.resolveDirectionId(dirName);
 
       const emailItem: MailItem = {

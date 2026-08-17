@@ -42,3 +42,16 @@ export interface PushResponse {
   inserted: number;
   updated: number;
 }
+
+/** Результат полнотекстового поиска /api/mailer/search. */
+export interface SearchResultItem {
+  id: number;
+  number: string;
+  subject: string;
+  text: string;
+  author: string;
+  date: string;
+  direction_id: number;
+  rank: number;
+  similarity: number;
+}
