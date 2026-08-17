@@ -1,0 +1,23 @@
+{
+  "name": "sbe-mailer",
+  "version": "0.1.0",
+  "description": "Модуль писем как SBE-плагин: локальная БД yourbase/sbe_mailer/, синхронизация с mailer-service через JWT из ЦУП СБЕ ПМиПИР.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "esbuild": "^0.28.1",
+    "obsidian": "^1.11.4",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "jszip": "^3.10.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

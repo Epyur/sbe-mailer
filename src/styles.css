@@ -1,0 +1,156 @@
+/* Классы вьюхи писем (tn-mail-*) на семантических токенах дизайн-системы SBE. */
+
+.tn-mail-container {
+  padding: 12px;
+}
+
+.tn-mail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.tn-mail-header h3 {
+  margin: 0;
+  margin-right: auto;
+  font-size: 18px;
+}
+
+.tn-mail-header h4 {
+  margin: 0;
+}
+
+.tn-mail-input,
+.tn-mail-textarea,
+.tn-mail-select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tn-mail-textarea {
+  min-height: 150px;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.tn-mail-label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tn-mail-mb-8 {
+  margin-bottom: 8px;
+}
+
+.tn-mail-mb12 {
+  margin-bottom: 12px;
+}
+
+.tn-mail-mt12 {
+  margin-top: 12px;
+}
+
+.tn-mail-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: var(--font-smaller);
+}
+
+.tn-mail-filter-label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--content-primary-a-enabled);
+}
+
+.tn-mail-cb {
+  width: 16px;
+  height: 16px;
+  margin: 0 4px 0 0;
+  flex-shrink: 0;
+}
+
+.tn-mail-meta {
+  color: var(--content-secondary-enabled);
+  font-size: var(--font-smaller);
+  margin-bottom: 4px;
+}
+
+.tn-mail-flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tn-mail-flex-wrap {
+  flex-wrap: wrap;
+}
+
+.tn-mail-date {
+  width: 140px;
+}
+
+.tn-mail-select {
+  width: 160px;
+}
+
+.tn-mail-center {
+  text-align: center;
+}
+
+.tn-mail-p24 {
+  padding: 24px;
+}
+
+.tn-mail-row {
+  cursor: pointer;
+}
+
+.tn-mail-row:hover {
+  background: var(--background-secondary-hover);
+}
+
+.tn-mail-text {
+  white-space: pre-wrap;
+  font-size: var(--font-ui-small);
+  background: var(--background-secondary-enabled);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.tn-mail-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: var(--font-smaller);
+}
+
+.tn-mail-file {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--background-secondary-enabled);
+  border-radius: 4px;
+  color: var(--content-primary-a-enabled);
+}
+
+.tn-mail-file-remove {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--content-accent-enabled);
+  cursor: pointer;
+}
+
+.tn-mail-hidden {
+  display: none;
+}
