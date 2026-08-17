@@ -132,13 +132,38 @@ export class MailDatabase {
     const directionName = existing && existing.direction_id === s.direction_id && existing.direction_name
       ? existing.direction_name
       : this.getDirectionName(s.direction_id);
+    // Если имя направления пришло с сервера (или локальный реестр его знает) —
+    // гарантируем его наличие в реестре, чтобы оно появилось в списке выбора.
+    const resolvedName = directionName || s.direction_name || '';
+    if (resolvedName && s.direction_id !== 0) {
+      this.ensureDirection(s.direction_id, resolvedName);
+    }
     return {
       ...s,
       images: Array.isArray(s.images) ? s.images : [],
-      direction_name: directionName || s.direction_name || '',
+      direction_name: resolvedName || s.direction_name || '',
       sync_status: 'synced',
       lastSyncTime: s.updated_at,
     };
+  }
+
+  /** Гарантирует наличие направления в реестре directions[] (для списка выбора). */
+  private ensureDirection(directionId: number, name: string): void {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const existing = this.data.directions.find(d => d.id === directionId);
+    if (existing) {
+      if (existing.name !== trimmed) existing.name = trimmed;
+      return;
+    }
+    // По id нет — добавляем запись (даже если имя уже есть под другим id:
+    // резолв по имени при создании письма найдёт первое совпадение).
+    this.addDirection({
+      id: directionId,
+      name: trimmed,
+      description: '',
+      created_at: new Date().toISOString(),
+    });
   }
 
   /** Сравнение ISO-строк времени. -1/0/+1. */

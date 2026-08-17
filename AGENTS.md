@@ -59,6 +59,17 @@ SBE-плагин «Письма»: локальная БД-кэш писем + �
 
 ## История работ
 
+### 2026-08-17 — v0.1.3 (направления: создание из UI + синхронизация)
+- Кнопка «➕ Создать направление» в формах создания и редактирования письма —
+  создаёт направление в локальном реестре `directions[]` (метод `createDirectionFromField`),
+  обновляет datalist.
+- Сервер (backend/main.go): колонка `direction_name` в `emails` + push/pull передают её.
+- `mergeFromServer`/`fromServer`: при pull письма с новым `direction_name` добавляет его
+  в `directions[]` (метод `ensureDirection`) — на другом компьютере направление появляется
+  и в деталях, и в списке выбора. Push шлёт `direction_name`.
+- E2E: push с direction_name → inserted:1, pull возвращает имя; тестовое письмо удалено.
+- Версия 0.1.2 → **0.1.3** (manifest + package.json). tsc EXIT=0, build OK.
+
 ### 2026-08-17 — v0.1.2 (источник реестра)
 - `sbe-core`: `DEFAULT_REGISTRY_URL` → `https://epyur.fvds.ru/registry.json`
   (raw.githubusercontent.com отдавал 429). Пересборка `main.js`, исходники не менялись.

@@ -316,11 +316,15 @@ export class MailView extends ItemView {
     const dirLabel = container.createEl('label', { text: 'Направление', cls: 'tn-mail-label' });
     const dirInput = container.createEl('input', {
       attr: { type: 'text', list: 'tn-mail-dirs' },
-      cls: 'tn-mail-input tn-mail-mb12',
+      cls: 'tn-mail-input',
     });
     const currentDirName = email.direction_name || this.plugin.mailDb.getDirectionName(email.direction_id);
     dirInput.value = currentDirName;
     this.renderDirDatalist(dirInput);
+
+    const dirRow = container.createDiv({ cls: 'tn-mail-flex tn-mail-mb12' });
+    const addDirBtn = dirRow.createEl('button', { text: '➕ Создать направление', cls: 'tn-btn tn-btn-ghost' });
+    addDirBtn.addEventListener('click', () => this.createDirectionFromField(dirInput));
 
     const btnRow = container.createDiv({ cls: 'tn-mail-header tn-mail-mt12' });
 
@@ -443,9 +447,13 @@ export class MailView extends ItemView {
     const dirLabel = container.createEl('label', { text: 'Направление', cls: 'tn-mail-label' });
     const dirInput = container.createEl('input', {
       attr: { type: 'text', list: 'tn-mail-dirs' },
-      cls: 'tn-mail-input tn-mail-mb12',
+      cls: 'tn-mail-input',
     });
     this.renderDirDatalist(dirInput);
+
+    const dirRow = container.createDiv({ cls: 'tn-mail-flex tn-mail-mb12' });
+    const addDirBtn = dirRow.createEl('button', { text: '➕ Создать направление', cls: 'tn-btn tn-btn-ghost' });
+    addDirBtn.addEventListener('click', () => this.createDirectionFromField(dirInput));
 
     const btnRow = container.createDiv({ cls: 'tn-mail-header tn-mail-mt12' });
 
@@ -507,6 +515,30 @@ export class MailView extends ItemView {
       datalist.createEl('option', { value: d.name });
     }
     document.body.appendChild(datalist);
+  }
+
+  /** Создаёт направление из введённого имени (если ещё нет) и обновляет datalist. */
+  private async createDirectionFromField(dirInput: HTMLInputElement): Promise<void> {
+    const name = dirInput.value.trim();
+    if (!name) {
+      new Notice('Введите название направления');
+      dirInput.focus();
+      return;
+    }
+    const existing = this.plugin.mailDb.getDirections().find(d => d.name === name);
+    if (existing) {
+      new Notice(`Направление «${name}» уже существует`);
+      return;
+    }
+    this.plugin.mailDb.addDirection({
+      id: Date.now() + Math.floor(Math.random() * 100),
+      name,
+      description: '',
+      created_at: new Date().toISOString(),
+    });
+    await this.plugin.mailDb.save();
+    this.renderDirDatalist(dirInput);
+    new Notice(`Направление «${name}» создано`);
   }
 
   private renderAttachedFiles(container: HTMLElement, files: string[], onRemove?: (index: number) => void): void {
