@@ -21,6 +21,7 @@ export interface SbeMailSettings {
   docxExportFolder: string;
   selectedDirectionIds: number[];
   llmModel: string;
+  legacyMigrated: boolean;
 }
 
 const DEFAULT_SETTINGS: SbeMailSettings = {
@@ -35,6 +36,7 @@ const DEFAULT_SETTINGS: SbeMailSettings = {
   docxExportFolder: 'Экспорт писем',
   selectedDirectionIds: [],
   llmModel: 'gpt-5.6-luna',
+  legacyMigrated: false,
 };
 
 /** Локальный путь шаблона письма, скачанного с сервера. */
@@ -110,6 +112,20 @@ export default class SbeMailPlugin extends Plugin {
       console.warn(`Письма: удалено ${removed} дубликатов по id из локальной БД`);
     }
 
+    // Флаг в настройках гарантирует одноразовость. Раньше при непустой локальной БД
+    // на каждом старте плагина вызывался importMissingLegacy() по всему статичному
+    // legacy-файлу с guard'ом «нет по id/теме в текущей БД» — после удаления письма
+    // его тема пропадала из guard'а, и легаси-копия того же письма реимпортировалась
+    // как новая (sync_status='local'), затем push возвращал удалённое письмо на сервер
+    // и на все машины. С флагом импорт из legacy выполняется максимум один раз в жизни
+    // плагина, удаления больше не воскрешаются.
+    if (this.settings.legacyMigrated) return;
+    if (this.mailDb.getAllEmails().length > 0 || this.mailDb.getDirections().length > 0) {
+      this.settings.legacyMigrated = true;
+      await this.saveSettings();
+      return;
+    }
+
     const adapter = this.app.vault.adapter;
     const legacyPath = 'yourbase/mailer_data.json';
     try {
@@ -121,26 +137,11 @@ export default class SbeMailPlugin extends Plugin {
       const directions = Array.isArray(parsed.directions) ? parsed.directions : [];
       if (emails.length === 0 && directions.length === 0) return;
 
-      if (this.mailDb.getAllEmails().length === 0 && this.mailDb.getDirections().length === 0) {
-        this.mailDb.importLegacy(emails, directions);
-        await this.mailDb.save();
-        new Notice(`Письма: импортировано ${emails.length} писем из legacy-БД. Они будут отправлены на сервер при первой синхронизации.`);
-        return;
-      }
-
-      // Сначала докачиваем актуальное состояние с сервера, чтобы subject-guard
-      // в importMissingLegacy не импортировал письма, уже попавшие на сервер под новым id.
-      try {
-        await this.syncService.pullAndMerge();
-      } catch (e: unknown) {
-        console.warn('Письма: pull перед повторной миграцией не удался — продолжаем по локальному кэшу:', errorMessage(e));
-      }
-
-      const added = this.mailDb.importMissingLegacy(emails, directions);
-      if (added > 0) {
-        await this.mailDb.save();
-        new Notice(`Письма: добавлено ${added} писем из legacy-БД. Они будут отправлены на сервер при первой синхронизации.`);
-      }
+      this.mailDb.importLegacy(emails, directions);
+      await this.mailDb.save();
+      this.settings.legacyMigrated = true;
+      await this.saveSettings();
+      new Notice(`Письма: импортировано ${emails.length} писем из legacy-БД. Они будут отправлены на сервер при первой синхронизации.`);
     } catch (e: unknown) {
       console.warn('Письма: не удалось импортировать legacy-БД:', errorMessage(e));
     }

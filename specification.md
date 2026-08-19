@@ -82,6 +82,9 @@
 ## Локальная БД
 
 - Путь: `yourbase/sbe_mailer/mail_data.json` → `{"emails": [MailItem], "directions": [MailDirection]}`.
-- Миграция из `yourbase/mailer_data.json` (монолит `obsidian-yougile`): первый раз —
-  полный импорт (`sync_status=local`), повторно — только письма с новыми id и темами
-  (subject-guard), перед этим `pullAndMerge`.
+- Миграция из `yourbase/mailer_data.json` (монолит `obsidian-yougile`): полный импорт
+  (`sync_status=local`) только если локальная БД пуста, максимум один раз за всё время
+  жизни плагина — гарантируется флагом `legacyMigrated` в настройках. Повторного
+  доимпорта по guard'у нет (убран в v0.1.11 — конфликтовал с удалением писем: guard по
+  теме не отличал «письмо ещё не мигрировано» от «письмо удалено», и удалённые письма
+  реимпортировались из статичного legacy-файла при каждом перезапуске плагина).

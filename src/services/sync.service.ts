@@ -39,16 +39,6 @@ export class MailSyncService {
     return { pushed, pulled: pulled.emails.length };
   }
 
-  /** Только pull + merge (без push). Используется перед повторной миграцией, чтобы
-   *  свежая копия сервера не дала импортировать письма, уже попавшие туда под новым id. */
-  async pullAndMerge(): Promise<number> {
-    const token = await this.getToken();
-    const pulled = await this.pull(token);
-    this.db.mergeFromServer(pulled.emails);
-    await this.db.save();
-    return pulled.emails.length;
-  }
-
   private async getToken(): Promise<string> {
     const apstore = await getService('sbe-apstore');
     return apstore.auth.getToken('mailer');
