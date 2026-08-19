@@ -1,9 +1,9 @@
-﻿{
+{
   "id": "sbe-mailer",
-  "name": "РџРёСЃСЊРјР°",
+  "name": "Письма",
   "version": "0.1.12",
   "minAppVersion": "1.11.4",
-  "description": "РњРѕРґСѓР»СЊ РїРёСЃРµРј РєР°Рє SBE-РїР»Р°РіРёРЅ: Р»РѕРєР°Р»СЊРЅР°СЏ Р‘Р” yourbase/sbe_mailer/, СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ СЃ СЃРµСЂРІРµСЂРѕРј mailer-service С‡РµСЂРµР· JWT РёР· Р¦РЈРџ РЎР‘Р• РџРњРёРџРР .",
-  "author": "РџРѕР»РёС‰СѓРє Р•РІРіРµРЅРёР№ (polishchuk@tn.ru)",
+  "description": "Модуль писем как SBE-плагин: локальная БД yourbase/sbe_mailer/, синхронизация с сервером mailer-service через JWT из ЦУП СБЕ ПМиПИР.",
+  "author": "Полищук Евгений (polishchuk@tn.ru)",
   "isDesktopOnly": true
 }

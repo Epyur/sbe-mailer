@@ -1,7 +1,7 @@
-﻿{
+{
   "name": "sbe-mailer",
   "version": "0.1.12",
-  "description": "РњРѕРґСѓР»СЊ РїРёСЃРµРј РєР°Рє SBE-РїР»Р°РіРёРЅ: Р»РѕРєР°Р»СЊРЅР°СЏ Р‘Р” yourbase/sbe_mailer/, СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ СЃ mailer-service С‡РµСЂРµР· JWT РёР· Р¦РЈРџ РЎР‘Р• РџРњРёРџРР .",
+  "description": "Модуль писем как SBE-плагин: локальная БД yourbase/sbe_mailer/, синхронизация с сервером mailer-service через JWT из ЦУП СБЕ ПМиПИР.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
