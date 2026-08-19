@@ -450,6 +450,24 @@
   gap: 4px 8px;
 }
 
+.tn-mail-card-snippet {
+  color: var(--muted);
+  font-size: var(--font-smaller);
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tn-mail-card-files {
+  color: var(--accent);
+  font-size: var(--font-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ================= Фильтры по направлениям в сайдбаре ================= */
 
 .tn-mail-sidebar-filter {

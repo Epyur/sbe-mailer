@@ -319,8 +319,27 @@ export class MailView extends ItemView {
     const dirName = email.direction_name || this.plugin.mailDb.getDirectionName(email.direction_id);
     const metaParts: string[] = [`✍️ ${email.author}`];
     if (dirName) metaParts.push(`📁 ${dirName}`);
-    metaParts.push(email.sync_status === 'synced' ? '☁️ Синхронизировано' : '📝 Локально');
+    const synced = email.sync_status === 'synced';
+    metaParts.push(synced ? '☁️ Синхронизировано' : '📝 Локально');
     card.createDiv({ cls: 'tn-mail-card-meta', text: metaParts.join(' · ') });
+
+    if (email.text) {
+      const snippet = email.text.replace(/\s+/g, ' ').trim();
+      card.createDiv({
+        cls: 'tn-mail-card-snippet',
+        text: snippet.length > 160 ? `${snippet.slice(0, 160)}…` : snippet,
+      });
+    }
+
+    if (email.images && email.images.length > 0) {
+      const files = card.createDiv({ cls: 'tn-mail-card-files' });
+      const count = email.images.length;
+      const names = email.images
+        .map(url => url.split('/').pop() || url)
+        .slice(0, 3)
+        .join(', ');
+      files.setText(`📎 ${count} ${count === 1 ? 'файл' : count < 5 ? 'файла' : 'файлов'}: ${names}${count > 3 ? '…' : ''}`);
+    }
 
     card.addEventListener('click', () => this.renderEmailDetail(email));
   }
