@@ -6,11 +6,25 @@ import { errorMessage } from '../../../sbe-core/src/utils/errors';
 
 export const SBE_MAIL_VIEW_TYPE = 'sbe-mail-view';
 
+type NavKey = 'mails';
+
+const PAGE_META: Record<NavKey, { title: string; sub: string }> = {
+  mails: { title: 'Все письма', sub: 'Реестр исходящих писем' },
+};
+
 export class MailView extends ItemView {
   plugin: SbeMailPlugin;
-  private containerElContent!: HTMLElement;
+  private rootEl!: HTMLElement;
+  private navEl!: HTMLElement;
+  private filtersEl!: HTMLElement;
+  private pageTitleEl!: HTMLElement;
+  private pageSubEl!: HTMLElement;
+  private crumbEl!: HTMLElement;
+  private collapseLabel!: HTMLElement;
+  private bodyEl!: HTMLElement;
+  private key: NavKey = 'mails';
+  private collapsed = false;
   private selectedDirectionIds: Set<number> = new Set();
-  private createViewActive = false;
   private searchQuery = '';
   private searchTimeout: number | null = null;
   private filterDateFrom = '';
@@ -28,7 +42,7 @@ export class MailView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Письма';
+    return 'LogicTEAM.Письма';
   }
 
   getIcon(): string {
@@ -38,7 +52,8 @@ export class MailView extends ItemView {
   async onOpen(): Promise<void> {
     const container = this.contentEl;
     container.addClass('tn-mail-container');
-    this.containerElContent = container.createDiv();
+    this.rootEl = container.createDiv({ cls: 'tn-mail-app' });
+
     this.selectedDirectionIds = new Set(this.plugin.settings.selectedDirectionIds);
     try {
       const me = await this.plugin.syncService.getMyPermission();
@@ -47,10 +62,154 @@ export class MailView extends ItemView {
       console.warn('Письма: не удалось получить роль:', errorMessage(e));
       this.myRole = '';
     }
-    await this.syncAndRender();
+
+    this.buildShell();
+    this.syncNavActive();
+    this.renderPage();
   }
 
-  /** Роль editor или выше — можно создавать/редактировать письма. */
+  refresh(): void {
+    this.renderPage();
+  }
+
+  // ---- Каркас ----
+
+  private buildShell(): void {
+    // шапка
+    const topbar = this.rootEl.createDiv({ cls: 'tn-mail-topbar' });
+    topbar.createDiv({ cls: 'tn-mail-module-title', text: 'LogicTEAM.Письма' });
+    this.crumbEl = topbar.createDiv({ cls: 'tn-mail-crumb' });
+    const spacer = topbar.createDiv({ cls: 'tn-mail-spacer' });
+    spacer.empty();
+    if (this.canEdit) {
+      const createBtn = topbar.createEl('button', { text: '＋ Новое письмо', cls: 'tn-mail-create' });
+      createBtn.addEventListener('click', () => this.showCreateForm());
+    }
+
+    // главная область: сайдбар + контент
+    const main = this.rootEl.createDiv({ cls: 'tn-mail-main' });
+
+    const sidebar = main.createDiv({ cls: 'tn-mail-sidebar' });
+
+    // сворачивание
+    const collapseBtn = sidebar.createDiv({ cls: 'tn-mail-collapse' });
+    collapseBtn.createSpan({ text: '▧' });
+    this.collapseLabel = collapseBtn.createSpan({ cls: 'tn-mail-collapse-lbl', text: 'Свернуть' });
+    collapseBtn.addEventListener('click', () => this.toggleCollapse());
+
+    // дерево навигации + фильтры по направлениям
+    this.navEl = sidebar.createDiv({ cls: 'tn-mail-nav' });
+    this.buildNav();
+
+    // панель управления: синхронизация и экспорт HTML
+    const actions = sidebar.createDiv({ cls: 'tn-mail-sidebar-actions' });
+    const syncBtn = actions.createEl('button', { cls: 'tn-mail-nav-action' });
+    syncBtn.createSpan({ text: '🔄' });
+    syncBtn.createSpan({ cls: 'tn-mail-nav-lbl', text: 'Синхронизация' });
+    syncBtn.addEventListener('click', () => { void this.syncAndRender(); });
+    const exportBtn = actions.createEl('button', { cls: 'tn-mail-nav-action' });
+    exportBtn.createSpan({ text: '📄' });
+    exportBtn.createSpan({ cls: 'tn-mail-nav-lbl', text: 'Экспорт HTML' });
+    exportBtn.addEventListener('click', () => { void this.exportHtml(); });
+
+    const content = main.createDiv({ cls: 'tn-mail-content' });
+    this.pageTitleEl = content.createEl('h1', { cls: 'tn-mail-page-title' });
+    this.pageSubEl = content.createDiv({ cls: 'tn-mail-page-sub' });
+    this.bodyEl = content.createDiv();
+  }
+
+  private buildNav(): void {
+    this.navEl.empty();
+
+    // Группа «Письма»
+    const mailGroup = this.navEl.createEl('button', { cls: 'tn-mail-grp' });
+    mailGroup.createSpan({ cls: 'tn-mail-grp-ico', text: '📧' });
+    mailGroup.createSpan({ cls: 'tn-mail-grp-lbl', text: 'Письма' });
+    mailGroup.createSpan({ cls: 'tn-mail-grp-chev', text: '▶' });
+    mailGroup.addEventListener('click', () => {
+      mailGroup.classList.toggle('open');
+      mailGroup.classList.toggle('active');
+    });
+    const mailSubmenu = this.navEl.createDiv({ cls: 'tn-mail-submenu' });
+    const allMails = mailSubmenu.createEl('a', { cls: 'tn-mail-nav-item', attr: { href: '#' } });
+    allMails.createSpan({ cls: 'tn-mail-nav-lbl', text: 'Все письма' });
+    allMails.dataset.key = 'mails';
+    allMails.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      this.key = 'mails';
+      this.syncNavActive();
+      this.renderPage();
+    });
+    mailGroup.classList.add('open', 'active');
+
+    // Группа «Фильтры» — чекбоксы направлений
+    const filterGroup = this.navEl.createEl('button', { cls: 'tn-mail-grp' });
+    filterGroup.createSpan({ cls: 'tn-mail-grp-ico', text: '🔍' });
+    filterGroup.createSpan({ cls: 'tn-mail-grp-lbl', text: 'Фильтры' });
+    filterGroup.createSpan({ cls: 'tn-mail-grp-chev', text: '▶' });
+    filterGroup.addEventListener('click', () => {
+      filterGroup.classList.toggle('open');
+      filterGroup.classList.toggle('active');
+    });
+    this.filtersEl = this.navEl.createDiv({ cls: 'tn-mail-submenu tn-mail-filters-nav' });
+    filterGroup.classList.add('open');
+    this.renderSidebarFilters();
+
+    this.syncNavActive();
+  }
+
+  /** Чекбоксы фильтров по направлениям (в группе «Фильтры» сайдбара). */
+  private renderSidebarFilters(): void {
+    if (!this.filtersEl) return;
+    this.filtersEl.empty();
+    const directions = this.plugin.mailDb.getDirections();
+    if (directions.length === 0) {
+      this.filtersEl.createDiv({ cls: 'tn-mail-nav-empty' }).setText('Направлений пока нет');
+      return;
+    }
+    for (const dir of directions) {
+      const wrapper = this.filtersEl.createEl('label', { cls: 'tn-mail-filter-label tn-mail-sidebar-filter' });
+      const cb = wrapper.createEl('input', { attr: { type: 'checkbox' }, cls: 'tn-mail-cb' });
+      cb.checked = this.selectedDirectionIds.has(dir.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) this.selectedDirectionIds.add(dir.id);
+        else this.selectedDirectionIds.delete(dir.id);
+        this.plugin.settings.selectedDirectionIds = [...this.selectedDirectionIds];
+        void this.plugin.saveSettings();
+        this.renderPage();
+      });
+      wrapper.createEl('span').setText(dir.name);
+    }
+  }
+
+  private toggleCollapse(): void {
+    this.collapsed = !this.collapsed;
+    this.rootEl.classList.toggle('collapsed', this.collapsed);
+    if (this.collapseLabel) {
+      this.collapseLabel.setText(this.collapsed ? 'Развернуть' : 'Свернуть');
+    }
+  }
+
+  private syncNavActive(): void {
+    this.navEl.querySelectorAll('.tn-mail-nav-item').forEach((el) => {
+      const navEl = el as HTMLElement;
+      navEl.classList.toggle('active', navEl.dataset.key === this.key);
+    });
+  }
+
+  // ---- Страница ----
+
+  private renderPage(): void {
+    const meta = PAGE_META[this.key];
+    this.crumbEl.setText(meta.title);
+    this.pageTitleEl.setText(meta.title);
+    this.pageSubEl.setText(meta.sub);
+
+    this.bodyEl.empty();
+    this.renderEmailsView();
+  }
+
+  /** Роль editor/admin — можно создавать/редактировать письма. */
   private get canEdit(): boolean {
     return this.myRole === 'editor' || this.myRole === 'admin';
   }
@@ -60,56 +219,22 @@ export class MailView extends ItemView {
     return this.myRole === 'admin';
   }
 
-  refresh(): void {
-    this.renderView();
-  }
+  // ---- Список писем ----
 
-  private renderView(): void {
-    const container = this.containerElContent;
+  private renderEmailsView(): void {
+    const container = this.bodyEl;
     container.empty();
-    this.createViewActive = false;
 
-    const header = container.createDiv({ cls: 'tn-mail-header' });
-    header.createEl('h3', { text: '📧 Письма' });
-    if (this.canEdit) {
-      const newBtn = header.createEl('button', { text: '➕ Новое письмо', cls: 'tn-btn tn-btn-primary' });
-      newBtn.addEventListener('click', () => this.showCreateForm());
-    }
-    const refreshBtn = header.createEl('button', { text: '🔄', cls: 'tn-btn tn-btn-ghost' });
-    refreshBtn.addEventListener('click', () => { void this.syncAndRender(); });
-    const exportBtn = header.createEl('button', { text: '📄 Экспорт HTML', cls: 'tn-btn tn-btn-ghost' });
-    exportBtn.addEventListener('click', () => { void this.exportHtml(); });
-
-    const searchInput = container.createEl('input', { attr: { type: 'text', placeholder: '🔍 Поиск по номеру, теме, тексту...' }, cls: 'tn-mail-input tn-mail-mb-8' });
+    const searchInput = container.createEl('input', {
+      attr: { type: 'text', placeholder: '🔍 Поиск по номеру, теме, тексту...' },
+      cls: 'tn-mail-input tn-mail-mb-8',
+    });
     searchInput.value = this.searchQuery;
     searchInput.addEventListener('input', () => {
       this.searchQuery = searchInput.value;
       if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
-      this.searchTimeout = window.setTimeout(() => this.renderView(), 500);
+      this.searchTimeout = window.setTimeout(() => this.renderEmailsView(), 500);
     });
-
-    const directions = this.plugin.mailDb.getDirections();
-    if (directions.length > 0) {
-      const filterDiv = container.createDiv({ cls: 'tn-mail-mb-8 tn-mail-filters' });
-      filterDiv.createDiv({ text: 'Направления:', cls: 'tn-mail-meta' });
-      for (const dir of directions) {
-        const wrapper = filterDiv.createEl('label', { cls: 'tn-mail-filter-label' });
-        const cb = wrapper.createEl('input', { attr: { type: 'checkbox' }, cls: 'tn-mail-cb' });
-        cb.checked = this.selectedDirectionIds.has(dir.id);
-        cb.addEventListener('change', () => {
-          if (cb.checked) {
-            this.selectedDirectionIds.add(dir.id);
-          } else {
-            this.selectedDirectionIds.delete(dir.id);
-          }
-          this.plugin.settings.selectedDirectionIds = [...this.selectedDirectionIds];
-          void this.plugin.saveSettings();
-          this.renderView();
-        });
-        const span = wrapper.createEl('span');
-        span.setText(` ${dir.name}`);
-      }
-    }
 
     const filterRow = container.createDiv({ cls: 'tn-mail-flex tn-mail-flex-wrap tn-mail-mb-8' });
 
@@ -121,7 +246,7 @@ export class MailView extends ItemView {
     dateFromInput.addEventListener('input', () => {
       this.filterDateFrom = dateFromInput.value;
       if (dateFilterTimeout) window.clearTimeout(dateFilterTimeout);
-      dateFilterTimeout = window.setTimeout(() => this.renderView(), 1000);
+      dateFilterTimeout = window.setTimeout(() => this.renderEmailsView(), 1000);
     });
     filterRow.createSpan({ text: '—', cls: 'tn-mail-meta' });
     const dateToInput = filterRow.createEl('input', { attr: { type: 'date' }, cls: 'tn-mail-date' });
@@ -129,7 +254,7 @@ export class MailView extends ItemView {
     dateToInput.addEventListener('input', () => {
       this.filterDateTo = dateToInput.value;
       if (dateFilterTimeout) window.clearTimeout(dateFilterTimeout);
-      dateFilterTimeout = window.setTimeout(() => this.renderView(), 1000);
+      dateFilterTimeout = window.setTimeout(() => this.renderEmailsView(), 1000);
     });
 
     filterRow.createSpan({ text: 'Автор:', cls: 'tn-mail-meta' });
@@ -142,7 +267,7 @@ export class MailView extends ItemView {
     authorSelect.value = this.filterAuthor;
     authorSelect.addEventListener('change', () => {
       this.filterAuthor = authorSelect.value;
-      this.renderView();
+      this.renderEmailsView();
     });
 
     const emails = this.plugin.mailDb.getAllEmails();
@@ -220,13 +345,14 @@ export class MailView extends ItemView {
     }
   }
 
+  // ---- Детали письма ----
+
   private renderEmailDetail(email: MailItem): void {
-    const container = this.containerElContent;
+    const container = this.bodyEl;
     container.empty();
-    this.createViewActive = true;
 
     const backBtn = container.createEl('button', { text: '← Назад', cls: 'tn-btn tn-btn-ghost' });
-    backBtn.addEventListener('click', () => this.renderView());
+    backBtn.addEventListener('click', () => this.renderEmailsView());
 
     container.createEl('h3', { text: `${email.number} — ${email.subject}` });
 
@@ -265,6 +391,13 @@ export class MailView extends ItemView {
           },
           this.plugin.settings.docxTemplatePath,
           this.plugin.settings.docxExportFolder,
+          {
+            position: this.plugin.settings.position,
+            degree: this.plugin.settings.degree,
+            rank: this.plugin.settings.rank,
+            phone: this.plugin.settings.phone,
+            email: this.plugin.settings.email,
+          },
         );
       } catch (e: unknown) {
         console.warn('Письма: экспорт в Word не удался:', errorMessage(e));
@@ -286,7 +419,7 @@ export class MailView extends ItemView {
           this.plugin.mailDb.deleteEmail(email.id);
           await this.plugin.mailDb.save();
           new Notice('Письмо удалено');
-          this.renderView();
+          this.renderEmailsView();
         } catch (e: unknown) {
           new Notice(`Письма: не удалось удалить — ${errorMessage(e)}`);
           deleteBtn.setText('🗑 Удалить письмо');
@@ -306,10 +439,11 @@ export class MailView extends ItemView {
     }
   }
 
+  // ---- Формы ----
+
   private showEditForm(email: MailItem): void {
-    const container = this.containerElContent;
+    const container = this.bodyEl;
     container.empty();
-    this.createViewActive = true;
 
     const backBtn = container.createEl('button', { text: '← Назад', cls: 'tn-btn tn-btn-ghost' });
     backBtn.addEventListener('click', () => this.renderEmailDetail(email));
@@ -409,12 +543,11 @@ export class MailView extends ItemView {
   }
 
   private showCreateForm(initialSubject = '', initialText = ''): void {
-    const container = this.containerElContent;
+    const container = this.bodyEl;
     container.empty();
-    this.createViewActive = true;
 
     const backBtn = container.createEl('button', { text: '← Назад', cls: 'tn-btn tn-btn-ghost' });
-    backBtn.addEventListener('click', () => this.renderView());
+    backBtn.addEventListener('click', () => this.renderEmailsView());
 
     container.createEl('h3', { text: '✉️ Новое письмо' });
 
@@ -430,7 +563,7 @@ export class MailView extends ItemView {
     addDirBtn.addEventListener('click', () => this.createDirectionFromField(dirInput));
 
     const numberLabel = container.createEl('label', { text: 'Исходящий номер', cls: 'tn-mail-label' });
-    const numberHint = container.createDiv({ cls: 'tn-mail-meta tn-mail-mb8', text: 'Автоматически подставляется Номер последнего известного письма по выбранному направлению, не забудьте изменить' });
+    const numberHint = container.createDiv({ cls: 'tn-mail-meta tn-mail-mb-8', text: 'Автоматически подставляется Номер последнего известного письма по выбранному направлению, не забудьте изменить' });
     const numberInput = container.createEl('input', { attr: { type: 'text', placeholder: 'Например: 009' }, cls: 'tn-mail-input' });
 
     // При выборе направления подставляем номер последнего письма этого направления.
@@ -458,7 +591,7 @@ export class MailView extends ItemView {
     const aiDiv = container.createDiv({ cls: 'tn-mail-mt12 tn-mail-flex tn-mail-flex-wrap' });
     const aiInput = container.createEl('input', {
       attr: { type: 'text', placeholder: 'Опишите запрос для черновика: «ответ клиенту про ПВХ-мембраны на кровле»' },
-      cls: 'tn-mail-input tn-mail-mb8',
+      cls: 'tn-mail-input tn-mail-mb-8',
     });
     aiDiv.appendChild(aiInput);
     const aiBtn = container.createEl('button', { text: '✨ Сгенерировать черновик (AI)', cls: 'tn-btn tn-btn-primary' });
@@ -517,7 +650,7 @@ export class MailView extends ItemView {
 
     const saveBtn = btnRow.createEl('button', { text: '💾 Сохранить', cls: 'tn-btn tn-btn-primary' });
     const cancelBtn = btnRow.createEl('button', { text: 'Отмена', cls: 'tn-btn tn-btn-ghost' });
-    cancelBtn.addEventListener('click', () => this.renderView());
+    cancelBtn.addEventListener('click', () => this.renderEmailsView());
 
     saveBtn.addEventListener('click', async () => {
       const number = numberInput.value.trim();
@@ -559,7 +692,7 @@ export class MailView extends ItemView {
       this.plugin.mailDb.addEmail(emailItem);
       await this.plugin.mailDb.save();
       new Notice('Письмо сохранено (будет отправлено на сервер при синхронизации)');
-      this.renderView();
+      this.renderEmailsView();
     });
   }
 
@@ -596,6 +729,7 @@ export class MailView extends ItemView {
     });
     await this.plugin.mailDb.save();
     this.renderDirDatalist(dirInput);
+    this.renderSidebarFilters();
     new Notice(`Направление «${name}» создано`);
   }
 
@@ -685,10 +819,11 @@ export class MailView extends ItemView {
   async syncAndRender(): Promise<void> {
     try {
       await this.plugin.syncService.sync();
-      this.renderView();
+      this.renderSidebarFilters();
+      this.renderEmailsView();
     } catch (e: unknown) {
       new Notice(`Письма: синхронизация не выполнена — ${errorMessage(e)}`);
-      this.renderView();
+      this.renderEmailsView();
     }
   }
 }

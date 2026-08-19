@@ -44,11 +44,20 @@
 - Ответ: `{"emails": [Email, ...]}`. Поля сервера: `id, number, subject, text, author,
   date, direction_id, images, created_at, updated_at`; `mdFilePath="" mdFileHash=""
   lastSyncTime=updated_at sync_status="synced"` (дополняются на сервере).
+- `mergeFromServer` также удаляет из локального кэша письма со `sync_status="synced"`,
+  отсутствующие в ответе (удалены на сервере admin'ом); письма `local`/`conflict` не трогает —
+  их отправит следующий push.
 
 ### GET /api/mailer/template — DOCX-шаблон письма
 - Ответ 200: байты `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
 - 401/403/404. Плагин сохраняет его в `yourbase/sbe_mailer/templates/standard.docx`
   и ставит в `docxTemplatePath`.
+- Плейсхолдеры шаблона: `{{Номер}} {{Тема}} {{Текст}} {{Автор}} {{Дата}} {{Год}} {{Месяц}}
+  {{День}} {{Время}} {{Должность}} {{Телефон}} {{Почта}}`. Последние три — подпись из настроек
+  плагина (`position`+`degree`+`rank` объединяются через запятую в `{{Должность}}`, пустые
+  значения не подставляются). Подстановка идёт на уровне `<w:t>`-ранов документа
+  (`replacePlaceholdersAcrossRuns`), а не по всей строке XML — Word может разбить один
+  плейсхолдер на несколько ранов. `{{Текст}}` — блочная вставка абзацев, заменяется отдельно.
 
 ### POST /api/mailer/search — ⛔ ОТКЛЮЧЁН
 - Endpoint закомментирован на сервере (код `handleSearch` сохранён). Метод `search()`

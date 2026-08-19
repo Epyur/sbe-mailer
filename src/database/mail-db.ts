@@ -114,7 +114,9 @@ export class MailDatabase {
 
   /** Слияние писем с сервера (канон). Сервер авторитетен при равном/новом updated_at. */
   mergeFromServer(serverEmails: MailItem[]): void {
+    const serverIds = new Set<number>();
     for (const s of serverEmails) {
+      serverIds.add(s.id);
       const local = this.getEmailById(s.id);
       if (!local) {
         this.data.emails.push(this.fromServer(s));
@@ -125,6 +127,10 @@ export class MailDatabase {
       }
       // иначе локальная копия новее — оставляем (будет отправлена при следующем push)
     }
+    // Удаляем локальные копии, которых больше нет на сервере (удалены admin).
+    // Письма с локальными изменениями (sync_status='local') сохраняются — их
+    // отправит следующий push. 'conflict' тоже не трогаем (требует разбора).
+    this.data.emails = this.data.emails.filter(e => e.sync_status !== 'synced' || serverIds.has(e.id));
   }
 
   /** Преобразует письмо сервера в локальное, сохраняя направление из локальной копии. */

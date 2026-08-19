@@ -1,8 +1,268 @@
 /* Классы вьюхи писем (tn-mail-*) на семантических токенах дизайн-системы SBE. */
 
 .tn-mail-container {
-  padding: 12px;
+  padding: 0;
+  height: 100%;
 }
+
+/* ================= Фасад (каркас: шапка + сайдбар + контент) ================= */
+
+.tn-mail-app {
+  --accent: #E11B17;
+  --accent-soft: #FDECEB;
+  --bg: #F3F5F7;
+  --surface: #FFFFFF;
+  --border: #E7EAEF;
+  --muted: #667387;
+  --active-nav: #F9F9FA;
+  --radius: 16px;
+  --radius-sm: 10px;
+
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--bg);
+  color: #171725;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+/* шапка 54px */
+.tn-mail-topbar {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.tn-mail-module-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #171725;
+  white-space: nowrap;
+}
+
+.tn-mail-crumb {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tn-mail-spacer {
+  flex: 1;
+}
+
+.tn-mail-create {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.tn-mail-create:hover {
+  background: var(--accent-soft);
+}
+
+/* тело: сайдбар и контент — белые карточки */
+.tn-mail-main {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+}
+
+.tn-mail-sidebar {
+  width: 320px;
+  min-width: 320px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width .2s, min-width .2s;
+}
+
+.tn-mail-app.collapsed .tn-mail-sidebar {
+  width: 64px;
+  min-width: 64px;
+}
+
+.tn-mail-collapse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  color: var(--muted);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.tn-mail-collapse:hover {
+  color: #171725;
+}
+
+.tn-mail-app.collapsed .tn-mail-collapse .tn-mail-collapse-lbl {
+  display: none;
+}
+
+/* дерево навигации */
+.tn-mail-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+}
+
+.tn-mail-grp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: #171725;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.tn-mail-grp:hover {
+  background: var(--bg);
+}
+
+.tn-mail-grp .tn-mail-grp-chev {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform .15s;
+}
+
+.tn-mail-grp.open .tn-mail-grp-chev {
+  transform: rotate(90deg);
+}
+
+.tn-mail-grp.open {
+  color: var(--accent);
+}
+
+.tn-mail-submenu {
+  display: block;
+  padding-left: 14px;
+}
+
+.tn-mail-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: #171725;
+  text-decoration: none;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tn-mail-nav-item:hover {
+  background: var(--bg);
+}
+
+.tn-mail-nav-item.active {
+  background: var(--active-nav);
+  color: #171725;
+  font-weight: 600;
+}
+
+.tn-mail-app.collapsed .tn-mail-nav-lbl,
+.tn-mail-app.collapsed .tn-mail-grp .tn-mail-grp-lbl,
+.tn-mail-app.collapsed .tn-mail-nav-item .tn-mail-nav-lbl,
+.tn-mail-app.collapsed .tn-mail-submenu,
+.tn-mail-app.collapsed .tn-mail-grp .tn-mail-grp-chev {
+  display: none;
+}
+
+.tn-mail-app.collapsed .tn-mail-grp,
+.tn-mail-app.collapsed .tn-mail-nav-item {
+  padding: 9px;
+  justify-content: center;
+}
+
+/* панель управления (низ сайдбара) */
+.tn-mail-sidebar-actions {
+  border-top: 1px solid var(--border);
+  padding: 6px 10px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tn-mail-nav-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tn-mail-nav-action:hover {
+  background: var(--bg);
+  color: #171725;
+}
+
+.tn-mail-app.collapsed .tn-mail-nav-action .tn-mail-nav-lbl {
+  display: none;
+}
+
+.tn-mail-app.collapsed .tn-mail-nav-action {
+  padding: 9px;
+  justify-content: center;
+}
+
+/* контент */
+.tn-mail-content {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.tn-mail-page-title {
+  font-size: 18px;
+  margin: 0 0 4px 0;
+}
+
+.tn-mail-page-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* ================= Общие элементы форм/списков ================= */
 
 .tn-mail-header {
   display: flex;
@@ -53,14 +313,6 @@
 
 .tn-mail-mt12 {
   margin-top: 12px;
-}
-
-.tn-mail-filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  font-size: var(--font-smaller);
 }
 
 .tn-mail-filter-label {
@@ -153,4 +405,24 @@
 
 .tn-mail-hidden {
   display: none;
+}
+
+/* ================= Фильтры по направлениям в сайдбаре ================= */
+
+.tn-mail-sidebar-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.tn-mail-sidebar-filter:hover {
+  background: var(--bg);
+}
+
+.tn-mail-nav-empty {
+  color: var(--muted);
+  font-size: var(--font-smaller);
+  padding: 8px 10px;
 }

@@ -12,6 +12,11 @@ import { errorMessage } from '../../sbe-core/src/utils/errors';
 export interface SbeMailSettings {
   apiUrl: string;
   defaultAuthor: string;
+  position: string;
+  degree: string;
+  rank: string;
+  phone: string;
+  email: string;
   docxTemplatePath: string;
   docxExportFolder: string;
   selectedDirectionIds: number[];
@@ -21,6 +26,11 @@ export interface SbeMailSettings {
 const DEFAULT_SETTINGS: SbeMailSettings = {
   apiUrl: 'https://epyur.fvds.ru',
   defaultAuthor: 'И.И. Иванов',
+  position: '',
+  degree: '',
+  rank: '',
+  phone: '',
+  email: '',
   docxTemplatePath: '',
   docxExportFolder: 'Экспорт писем',
   selectedDirectionIds: [],

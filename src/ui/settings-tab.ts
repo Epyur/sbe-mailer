@@ -45,6 +45,65 @@ export class MailSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setHeading()
+      .setName('Подпись');
+
+    new Setting(containerEl)
+      .setName('Должность')
+      .setDesc('Подставляется в шаблон как {{Должность}} (объединяется через запятую с учёной степенью и званием).')
+      .addText(text => text
+        .setPlaceholder('Главный инженер')
+        .setValue(this.plugin.settings.position)
+        .onChange(async (value) => {
+          this.plugin.settings.position = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Учёная степень (при наличии)')
+      .setDesc('Например «канд. техн. наук».')
+      .addText(text => text
+        .setPlaceholder('канд. техн. наук')
+        .setValue(this.plugin.settings.degree)
+        .onChange(async (value) => {
+          this.plugin.settings.degree = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Учёное звание (при наличии)')
+      .setDesc('Например «доцент».')
+      .addText(text => text
+        .setPlaceholder('доцент')
+        .setValue(this.plugin.settings.rank)
+        .onChange(async (value) => {
+          this.plugin.settings.rank = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Телефон')
+      .setDesc('Подставляется в шаблон как {{Телефон}}.')
+      .addText(text => text
+        .setPlaceholder('+7 (999) 123-45-67')
+        .setValue(this.plugin.settings.phone)
+        .onChange(async (value) => {
+          this.plugin.settings.phone = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('E-mail')
+      .setDesc('Подставляется в шаблон как {{Почта}}.')
+      .addText(text => text
+        .setPlaceholder('polishchuk@tn.ru')
+        .setValue(this.plugin.settings.email)
+        .onChange(async (value) => {
+          this.plugin.settings.email = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setHeading()
       .setName('AI-генерация');
 
     new Setting(containerEl)

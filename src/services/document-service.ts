@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from 'obsidian';
+import { App, FileView, Notice, TFile } from 'obsidian';
 import JSZip from 'jszip';
 import { Document, Packer, Paragraph, TextRun, ImageRun } from 'docx';
 
@@ -11,6 +11,14 @@ interface EmailData {
   images?: string[];
 }
 
+interface SignatureData {
+  position: string;
+  degree: string;
+  rank: string;
+  phone: string;
+  email: string;
+}
+
 interface TemplateData {
   number: string;
   subject: string;
@@ -21,6 +29,9 @@ interface TemplateData {
   month: string;
   day: string;
   time: string;
+  position: string;
+  phone: string;
+  email: string;
 }
 
 /** Экспорт письма в DOCX: шаблон с плейсхолдерами или fallback-генерация. */
@@ -74,6 +85,88 @@ export class DocumentService {
     return result.join('');
   }
 
+  /** Подстановка текстовых плейсхолдеров в document.xml. Word разбивает один
+   *  плейсхолдер на несколько <w:r>/<w:t> (например "{{Должность}}" = "{{"+...),
+   *  поэтому замена выполняется по объединённому тексту всех <w:t> с последующей
+   *  пересборкой XML: значение кладётся в первый run плейсхолдера, остальные чистятся. */
+  private replacePlaceholdersAcrossRuns(xml: string, replacements: Record<string, string>): string {
+    // Разбиваем XML на элементы <w:t>...</w:t> и запоминаем их содержимое и позиции.
+    const tRe = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
+    const segments: Array<{ start: number; end: number; text: string }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = tRe.exec(xml)) !== null) {
+      segments.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        text: m[1],
+      });
+    }
+    if (segments.length === 0) return xml;
+
+    // Собираем единый "логический текст" из всех <w:t> в порядке документа
+    // и карту: смещение в логическом тексте -> (индекс сегмента, смещение внутри).
+    let logical = '';
+    const segStarts: number[] = [];
+    for (const seg of segments) {
+      segStarts.push(logical.length);
+      logical += seg.text;
+    }
+    const logicalEnds = segments.map((seg, i) => segStarts[i] + seg.text.length);
+
+    // Ищем плейсхолдеры {{...}} в логическом тексте и готовим правки по сегментам.
+    const newTexts = segments.map(s => s.text);
+    const phRe = /\{\{([^{}]*)\}\}/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = phRe.exec(logical)) !== null) {
+      const token = pm[0];
+      const value = replacements[token];
+      if (value === undefined) continue;
+      const phStart = pm.index;
+      const phEnd = pm.index + token.length;
+
+      // Сегмент, в котором начинается плейсхолдер.
+      const i = segments.findIndex((_, idx) => phStart >= segStarts[idx] && phStart < logicalEnds[idx]);
+      let j = segments.findIndex((_, idx) => phEnd > segStarts[idx] && phEnd <= logicalEnds[idx]);
+      if (phEnd === logical.length) {
+        j = segments.length - 1;
+      }
+      if (i === -1 || j === -1 || i > j) continue;
+
+      const startOffset = phStart - segStarts[i];
+      const endOffset = phEnd - segStarts[j];
+
+      if (i === j) {
+        // Плейсхолдер в одном <w:t> — обычная замена подстроки.
+        newTexts[i] = newTexts[i].slice(0, startOffset) + value + newTexts[i].slice(endOffset);
+      } else {
+        // Плейсхолдер разорван на несколько <w:t>: значение в первый сегмент,
+        // промежуточные очищаем, в последнем оставляем текст после плейсхолдера.
+        newTexts[i] = newTexts[i].slice(0, startOffset) + value;
+        for (let k = i + 1; k < j; k++) newTexts[k] = '';
+        newTexts[j] = newTexts[j].slice(endOffset);
+      }
+    }
+
+    // Пересобираем XML, заменяя содержимое каждого <w:t> на изменённое.
+    let result = '';
+    let cursor = 0;
+    for (let idx = 0; idx < segments.length; idx++) {
+      const seg = segments[idx];
+      if (newTexts[idx] !== seg.text) {
+        result += xml.slice(cursor, seg.start);
+        const innerOpen = xml.indexOf('>', seg.start) + 1;
+        const innerClose = xml.lastIndexOf('</w:t>', seg.end);
+        result += xml.slice(seg.start, innerOpen) + newTexts[idx] + xml.slice(innerClose, seg.end);
+        cursor = seg.end;
+      } else {
+        result += xml.slice(cursor, seg.end);
+        cursor = seg.end;
+      }
+    }
+    result += xml.slice(cursor);
+    return result;
+  }
+
   private async getImageSize(path: string): Promise<{ width: number; height: number }> {
     try {
       const adapter = this.app.vault.adapter;
@@ -116,13 +209,20 @@ export class DocumentService {
     return ((buffer[offset] ?? 0) << 24) + ((buffer[offset + 1] ?? 0) << 16) + ((buffer[offset + 2] ?? 0) << 8) + (buffer[offset + 3] ?? 0);
   }
 
-  async exportToDocx(emailData: EmailData, templatePath: string, exportFolder: string): Promise<string> {
+  async exportToDocx(emailData: EmailData, templatePath: string, exportFolder: string, signature?: SignatureData): Promise<string> {
     try {
       const emailDate = emailData.date ? new Date(emailData.date) : new Date();
       const formattedDate = emailDate.toLocaleDateString('ru-RU');
 
       const originalText = emailData.text || '';
       const emailImages: string[] = emailData.images || [];
+
+      // Должность, учёная степень и учёное звание объединяются в одну строку
+      // (через запятую, без переносов) — подставляется в {{Должность}}.
+      const positionLine = [signature?.position, signature?.degree, signature?.rank]
+        .map(v => (v || '').trim())
+        .filter(Boolean)
+        .join(', ');
 
       const data: TemplateData = {
         number: emailData.number || '',
@@ -134,6 +234,9 @@ export class DocumentService {
         month: (emailDate.getMonth() + 1).toString().padStart(2, '0'),
         day: emailDate.getDate().toString().padStart(2, '0'),
         time: emailDate.toLocaleTimeString('ru-RU'),
+        position: positionLine,
+        phone: (signature?.phone || '').trim(),
+        email: (signature?.email || '').trim(),
       };
 
       let templateFound = false;
@@ -163,21 +266,27 @@ export class DocumentService {
           if (documentFile) {
             let xmlContent = await documentFile.async('text');
 
-            const replacements: Record<string, string> = {
+            // Текстовые плейсхолдеры. Word часто разбивает один плейсхолдер на
+            // несколько <w:r>/<w:t> (например "{{Должность}}" = "{{"+"Должность"+}}"),
+            // поэтому подстановка делается на уровне runs, а не по всей строке XML.
+            const textReplacements: Record<string, string> = {
               '{{Номер}}': this.escapeXml(data.number),
               '{{Тема}}': this.escapeXml(data.subject),
-              '{{Текст}}': this.formatTextForDocxXml(originalText),
               '{{Автор}}': this.escapeXml(data.author),
               '{{Дата}}': this.escapeXml(data.date),
               '{{Год}}': this.escapeXml(data.year),
               '{{Месяц}}': this.escapeXml(data.month),
               '{{День}}': this.escapeXml(data.day),
               '{{Время}}': this.escapeXml(data.time),
+              '{{Должность}}': this.escapeXml(data.position),
+              '{{Телефон}}': this.escapeXml(data.phone),
+              '{{Почта}}': this.escapeXml(data.email),
             };
+            xmlContent = this.replacePlaceholdersAcrossRuns(xmlContent, textReplacements);
 
-            for (const [placeholder, value] of Object.entries(replacements)) {
-              xmlContent = xmlContent.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
-            }
+            // {{Текст}} — блочная вставка абзацев (в шаблоне лежит целиком в одном
+            // <w:t>), заменяется отдельно вместе с разметкой <w:p>.
+            xmlContent = xmlContent.replace(/\{\{Текст\}\}/g, this.formatTextForDocxXml(originalText));
 
             zip.file('word/document.xml', xmlContent);
             resultBuffer = await zip.generateAsync({ type: 'arraybuffer' });
@@ -215,7 +324,18 @@ export class DocumentService {
 
       const file = this.app.vault.getAbstractFileByPath(filePath);
       if (file instanceof TFile) {
-        await this.app.workspace.getLeaf().openFile(file);
+        // Переиспользуем вкладку, где уже открыт какой-то .docx экспорт, чтобы не
+        // плодить новую вкладку на каждый экспорт. Если такой нет — открываем новую.
+        const docxLeaf = this.app.workspace.getLeavesOfType('file')
+          .find(leaf => leaf.view instanceof FileView && leaf.view.file?.extension === 'docx');
+        if (docxLeaf) {
+          await docxLeaf.openFile(file);
+          this.app.workspace.revealLeaf(docxLeaf);
+        } else {
+          const leaf = this.app.workspace.getLeaf('tab');
+          await leaf.openFile(file);
+          this.app.workspace.revealLeaf(leaf);
+        }
       }
 
       new Notice(`✅ Экспорт завершён: ${fileName}${templateFound ? ' (с шаблоном)' : ' (стандартный)'}`);
@@ -305,6 +425,15 @@ export class DocumentService {
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: '─────────────────────────────────────────────────────' })] }));
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: 'С уважением,' })] }));
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: data.author })] }));
+    if (data.position) {
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: data.position })] }));
+    }
+    if (data.phone) {
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `Тел. ${data.phone}` })] }));
+    }
+    if (data.email) {
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `e-mail: ${data.email}` })] }));
+    }
 
     const doc = new Document({
       styles: { default: { document: { run: { size: 24 } } } },
