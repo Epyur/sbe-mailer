@@ -795,20 +795,8 @@
   width: 160px;
 }
 
-.tn-mail-center {
-  text-align: center;
-}
-
 .tn-mail-p24 {
   padding: 24px;
-}
-
-.tn-mail-row {
-  cursor: pointer;
-}
-
-.tn-mail-row:hover {
-  background: var(--background-secondary-hover);
 }
 
 .tn-mail-text {
@@ -845,6 +833,61 @@
 
 .tn-mail-hidden {
   display: none;
+}
+
+/* ================= Карточки писем ================= */
+
+.tn-mail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tn-mail-card:hover {
+  border-color: var(--accent);
+}
+
+.tn-mail-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tn-mail-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tn-mail-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--muted);
+  background: var(--bg);
+}
+
+.tn-mail-card-meta {
+  color: var(--muted);
+  font-size: var(--font-smaller);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
 
 /* ================= Фильтры по направлениям в сайдбаре ================= */

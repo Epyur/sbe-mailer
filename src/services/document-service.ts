@@ -1,4 +1,4 @@
-import { App, FileView, Notice, TFile } from 'obsidian';
+import { App, FileSystemAdapter, Notice } from 'obsidian';
 import JSZip from 'jszip';
 import { Document, Packer, Paragraph, TextRun, ImageRun } from 'docx';
 
@@ -311,31 +311,25 @@ export class DocumentService {
         await this.app.vault.createFolder(folderPath);
       }
 
-      let filePath = `${folderPath}/${fileName}`;
-      let counter = 1;
-      while (await adapter.exists(filePath)) {
-        const newFileName = `Письмо_${safeNumber}_${safeSubject}_${counter}.docx`;
-        filePath = `${folderPath}/${newFileName}`;
-        counter++;
-      }
+      // Путь стабилен для одного письма (не плодим _1, _2, ... при повторном
+      // экспорте) — файл перезаписывается. Word/системное приложение при повторном
+      // открытии того же пути активирует уже открытый документ, а не заводит новый.
+      const filePath = `${folderPath}/${fileName}`;
 
       const uint8Array = new Uint8Array(resultBuffer);
       await adapter.writeBinary(filePath, uint8Array.buffer as ArrayBuffer);
 
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (file instanceof TFile) {
-        // Переиспользуем вкладку, где уже открыт какой-то .docx экспорт, чтобы не
-        // плодить новую вкладку на каждый экспорт. Если такой нет — открываем новую.
-        const docxLeaf = this.app.workspace.getLeavesOfType('file')
-          .find(leaf => leaf.view instanceof FileView && leaf.view.file?.extension === 'docx');
-        if (docxLeaf) {
-          await docxLeaf.openFile(file);
-          this.app.workspace.revealLeaf(docxLeaf);
-        } else {
-          const leaf = this.app.workspace.getLeaf('tab');
-          await leaf.openFile(file);
-          this.app.workspace.revealLeaf(leaf);
+      // .docx не имеет встроенного просмотрщика в Obsidian — открывается системным
+      // приложением (как в sbe-documents: openLocalFile для не-Obsidian-типов).
+      if (adapter instanceof FileSystemAdapter) {
+        const fullPath = adapter.getFullPath(filePath);
+        const { shell } = require('electron');
+        const openErr = await shell.openPath(fullPath);
+        if (openErr) {
+          new Notice(`Не удалось открыть Word: ${openErr}`);
         }
+      } else {
+        new Notice(`Файл сохранён: ${filePath}`);
       }
 
       new Notice(`✅ Экспорт завершён: ${fileName}${templateFound ? ' (с шаблоном)' : ' (стандартный)'}`);

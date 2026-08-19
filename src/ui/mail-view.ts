@@ -300,49 +300,29 @@ export class MailView extends ItemView {
 
     filtered.sort((a, b) => this.compareDatesDesc(a.date, b.date));
 
-    const table = container.createEl('table', { cls: 'tn-table' });
-
-    const thead = table.createEl('thead');
-    const headerRow = thead.createEl('tr');
-    const headers = ['№ п/п', 'Номер письма', 'Дата письма', 'Тема письма', 'Направление', 'Автор'];
-    for (const h of headers) {
-      const th = headerRow.createEl('th');
-      th.setText(h);
-    }
-
-    const tbody = table.createEl('tbody');
-
     if (filtered.length === 0) {
-      const emptyRow = tbody.createEl('tr');
-      const td = emptyRow.createEl('td', { cls: 'tn-mail-center tn-mail-p24' });
-      td.setAttr('colspan', '6');
-      td.setText('Нет писем');
+      container.createDiv({ cls: 'tn-mail-meta tn-mail-p24' }).setText('Нет писем');
       return;
     }
 
-    for (let i = 0; i < filtered.length; i++) {
-      const email = filtered[i];
-      const row = tbody.createEl('tr', { cls: 'tn-mail-row' });
-      row.addEventListener('click', () => this.renderEmailDetail(email));
-
-      const numCell = row.createEl('td');
-      numCell.setText(String(i + 1));
-
-      const numberCell = row.createEl('td');
-      numberCell.setText(email.number);
-
-      const dateCell = row.createEl('td');
-      dateCell.setText(new Date(email.date).toLocaleDateString());
-
-      const subjectCell = row.createEl('td');
-      subjectCell.setText(email.subject);
-
-      const dirCell = row.createEl('td');
-      dirCell.setText(email.direction_name || this.plugin.mailDb.getDirectionName(email.direction_id) || '—');
-
-      const authorCell = row.createEl('td');
-      authorCell.setText(email.author);
+    for (const email of filtered) {
+      this.renderCard(email, container);
     }
+  }
+
+  private renderCard(email: MailItem, container: HTMLElement): void {
+    const card = container.createDiv({ cls: 'tn-mail-card' });
+    const head = card.createDiv({ cls: 'tn-mail-card-head' });
+    head.createEl('h4', { text: `${email.number} — ${email.subject}`, cls: 'tn-mail-card-title' });
+    head.createSpan({ cls: 'tn-mail-chip', text: new Date(email.date).toLocaleDateString() });
+
+    const dirName = email.direction_name || this.plugin.mailDb.getDirectionName(email.direction_id);
+    const metaParts: string[] = [`✍️ ${email.author}`];
+    if (dirName) metaParts.push(`📁 ${dirName}`);
+    metaParts.push(email.sync_status === 'synced' ? '☁️ Синхронизировано' : '📝 Локально');
+    card.createDiv({ cls: 'tn-mail-card-meta', text: metaParts.join(' · ') });
+
+    card.addEventListener('click', () => this.renderEmailDetail(email));
   }
 
   // ---- Детали письма ----
