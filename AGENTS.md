@@ -75,6 +75,10 @@ SBE-плагин «Письма»: локальная БД-кэш писем + �
 
 ## История работ
 
+### 2026-08-20 — v0.1.13 (пересборка за sbe-core: SbeContactsApi)
+- `sbe-core`: добавлены `SbeContactsApi` и `'sbe-contacts'` в `SbeServiceMap` — пересборка `main.js`, исходники плагина не менялись. Версия 0.1.12 → **0.1.13** (manifest + package.json).
+- `npx tsc --noEmit` EXIT=0; `npm run build` OK.
+
 ### 2026-08-19 — v0.1.12 (карточки писем: превью текста и вложения)
 - **Карточки письма обогащены до уровня документов sbe-documents**: добавлено превью текста
   (`tn-mail-card-snippet`, до 160 символов, обрезка до 2 строк через `-webkit-line-clamp`)
