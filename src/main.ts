@@ -53,7 +53,24 @@ export default class SbeMailPlugin extends Plugin {
     this.mailDb = new MailDatabase(this.app);
     await this.mailDb.init();
     this.syncService = new MailSyncService(this.mailDb, () => this.settings.apiUrl);
-    this.llmGenerator = new LlmGenerator(() => this.mailDb.getAllEmails(), () => this.settings.llmModel);
+    this.llmGenerator = new LlmGenerator(
+      () => this.mailDb.getAllEmails(),
+      () => this.settings.llmModel,
+      async () => {
+        // Известные имена для маскировки ФИО в контексте LLM (ревью 3.5):
+        // берём из локального кэша контактов, best-effort.
+        try {
+          const path = 'yourbase/sbe_contacts/contacts_data.json';
+          if (!(await this.app.vault.adapter.exists(path))) return [];
+          const raw = await this.app.vault.adapter.read(path);
+          const data = JSON.parse(raw) as { contacts?: Array<{ name?: string }> };
+          return (data.contacts || []).map((c) => c.name || '').filter(Boolean);
+        } catch (e: unknown) {
+          console.warn('Письма: не удалось прочитать контакты для маскировки имён:', errorMessage(e));
+          return [];
+        }
+      },
+    );
 
     // Одноразовая миграция из legacy-БД монолита (yourbase/mailer_data.json).
     await this.migrateLegacyOnce();
