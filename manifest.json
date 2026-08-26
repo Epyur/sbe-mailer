@@ -1,7 +1,7 @@
 {
   "id": "sbe-mailer",
   "name": "Письма",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "minAppVersion": "1.11.4",
   "description": "Модуль писем как SBE-плагин: локальная БД yourbase/sbe_mailer/, синхронизация с сервером mailer-service через JWT из ЦУП СБЕ ПМиПИР.",
   "author": "Полищук Евгений (polishchuk@tn.ru)",
